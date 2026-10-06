@@ -1,0 +1,23 @@
+[project]
+name = "test-bracket"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Alejandro Perret-Gentil", email = "alejandroperret04@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "build123d>=0.13.0",
+    "matplotlib>=3.11.2",
+    "numpy>=2.5.3",
+    "pytest>=9.1.1",
+    "trimesh>=5.1.1",
+]
+
+[project.scripts]
+test-bracket = "test_bracket:main"
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"
