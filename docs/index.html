@@ -1,0 +1,961 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Test Bracket</title>
+<meta name="description" content="A parametric L-bracket built in build123d: CAD, drawing, verification and a live load estimate.">
+<meta name="author" content="Alejandro Perret-Gentil">
+<meta property="og:type" content="website">
+<meta property="og:title" content="L-Bracket, a parametric test part">
+<meta property="og:description" content="build123d code-CAD with a generated drawing, three-way volume check and an interactive load estimate.">
+<meta name="theme-color" content="#ECEFEE" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0C1116" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&family=Martian+Mono:wdth,wght@87.5,300..600&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,400&display=swap">
+<style>
+/* Layout: a drafting sheet. Reading column for prose, full-width "sheets" for the drawing and tools;
+   data sits in title-block grids. Layout blue (machinist's marking dye) is the only accent and marks dimensions. */
+:root {
+  --paper: #ECEFEE;
+  --sheet: #F8FAF9;
+  --ink: #131B23;
+  --muted: #59666F;
+  --rule: #C3CBCE;
+  --rule-soft: #DCE2E3;
+  --blue: #2343C2;
+  --blue-wash: rgba(35, 67, 194, .08);
+  --pass: #1C7547;
+  --warn: #9C5800;
+  --fail: #B42318;
+  --model: #AEB8BE;
+
+  --f-display: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Newsreader", Georgia, "Times New Roman", serif;
+  --f-mono: "Martian Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  --step--1: .8125rem;
+  --step-0: 1.0625rem;
+  --step-1: 1.3rem;
+  --step-2: clamp(1.6rem, 1.2rem + 1.4vw, 2.2rem);
+  --step-4: clamp(3.2rem, 1.6rem + 7vw, 7rem);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0C1116; --sheet: #111920; --ink: #DCE4E9; --muted: #8C9AA4;
+    --rule: #2A3640; --rule-soft: #1C262E; --blue: #86A2FF; --blue-wash: rgba(134, 162, 255, .10);
+    --pass: #52C98E; --warn: #E6A443; --fail: #FF7B70; --model: #6E7C86;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0C1116; --sheet: #111920; --ink: #DCE4E9; --muted: #8C9AA4;
+  --rule: #2A3640; --rule-soft: #1C262E; --blue: #86A2FF; --blue-wash: rgba(134, 162, 255, .10);
+  --pass: #52C98E; --warn: #E6A443; --fail: #FF7B70; --model: #6E7C86;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 var(--step-0)/1.6 var(--f-body);
+  font-optical-sizing: auto;
+}
+a { color: var(--blue); text-underline-offset: .18em; }
+a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible {
+  outline: 2px solid var(--blue); outline-offset: 2px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: clamp(16px, 4vw, 40px); }
+
+/* ---------- top bar ---------- */
+.bar { border-bottom: 1px solid var(--rule); position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(8px); }
+.bar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 12px; }
+.bar .id { font: 500 .75rem/1 var(--f-mono); letter-spacing: .02em; }
+.bar nav { display: flex; gap: clamp(10px, 2.4vw, 24px); flex-wrap: wrap; justify-content: flex-end; }
+.bar nav a { font: 600 .8rem/1 var(--f-display); font-stretch: 112%; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); text-decoration: none; }
+.bar nav a:hover { color: var(--ink); }
+@media (max-width: 640px) { .bar nav a.opt { display: none; } }
+
+/* ---------- type ---------- */
+.eyebrow, .label { font: 500 .6875rem/1.3 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
+h1 { font-size: var(--step-4); font-weight: 820; font-stretch: 125%; line-height: .9; letter-spacing: -.02em; }
+h2 { font-size: var(--step-2); font-weight: 700; font-stretch: 115%; line-height: 1.1; letter-spacing: -.005em; }
+h3 { font-size: var(--step-1); font-weight: 650; font-stretch: 108%; line-height: 1.2; }
+p { margin: 0; max-width: 65ch; }
+.num, td.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+code, pre { font-family: var(--f-mono); }
+
+/* ---------- sections ---------- */
+section { padding-block: clamp(48px, 7vw, 88px); border-top: 1px solid var(--rule); }
+.hero { border-top: 0; padding-block: clamp(28px, 5vw, 56px) clamp(40px, 6vw, 72px); }
+.sec-head { display: grid; gap: 12px; margin-bottom: clamp(24px, 3.5vw, 36px); }
+.sec-head p { color: var(--muted); }
+
+/* ---------- hero ---------- */
+.hero-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: clamp(24px, 4vw, 56px); align-items: start; }
+@media (max-width: 900px) { .hero-grid { grid-template-columns: minmax(0, 1fr); } }
+.hero-title { display: grid; gap: 14px; margin-bottom: clamp(24px, 4vw, 44px); min-width: 0; }
+.hero-text { display: grid; gap: 22px; min-width: 0; }
+.hero h1 .rev { display: inline-block; vertical-align: top; margin-left: .35em; margin-top: .55em;
+  font: 500 .8rem/1 var(--f-mono); letter-spacing: .04em; color: var(--blue); border: 1px solid var(--blue); padding: 4px 6px; }
+.lead { font-size: 1.2rem; line-height: 1.5; }
+
+/* title-block style data grid */
+.tblock { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1.5px solid var(--ink); margin: 0; background: var(--sheet); }
+.tblock > div { padding: 10px 12px 11px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); min-width: 0; }
+.tblock > div:nth-child(3n) { border-right: 0; }
+.tblock > div:nth-last-child(-n+3) { border-bottom: 0; }
+.tblock dt { font: 500 .625rem/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.tblock dd { margin: 6px 0 0; font: 500 .95rem/1.25 var(--f-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tblock dd small { display: block; font-size: .68rem; color: var(--muted); margin-top: 3px; }
+@media (max-width: 480px) {
+  .tblock { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tblock > div:nth-child(3n) { border-right: 1px solid var(--rule); }
+  .tblock > div:nth-child(2n) { border-right: 0; }
+  .tblock > div:nth-last-child(-n+3) { border-bottom: 1px solid var(--rule); }
+  .tblock > div:nth-last-child(-n+2) { border-bottom: 0; }
+}
+
+/* ---------- 3D viewer ---------- */
+.viewer { margin: 0; position: relative; aspect-ratio: 1 / 1; max-width: 100%; background: var(--sheet);
+  border: 1px solid var(--rule); overflow: hidden; touch-action: none; }
+.viewer canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.viewer canvas:active { cursor: grabbing; }
+.viewer::before, .viewer::after { content: ""; position: absolute; width: 18px; height: 18px; pointer-events: none; border-color: var(--blue); border-style: solid; }
+.viewer::before { top: 10px; left: 10px; border-width: 1.5px 0 0 1.5px; }
+.viewer::after { bottom: 10px; right: 10px; border-width: 0 1.5px 1.5px 0; }
+.vtools { position: absolute; top: 14px; right: 14px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.seg { display: inline-flex; border: 1px solid var(--rule); background: var(--sheet); }
+.seg button, .btn { font: 500 .6875rem/1 var(--f-mono); letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
+  background: transparent; border: 0; padding: 8px 10px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button[aria-pressed="true"] { color: var(--sheet); background: var(--ink); }
+.seg button:hover:not([aria-pressed="true"]), .btn:hover { color: var(--ink); }
+.btn { border: 1px solid var(--rule); background: var(--sheet); }
+.vread { position: absolute; left: 14px; bottom: 12px; right: 40px; font: 400 .65rem/1.5 var(--f-mono); color: var(--muted); pointer-events: none; }
+.vread b { color: var(--ink); font-weight: 500; }
+#viewer-fallback { position: absolute; inset: 40px; color: var(--ink); }
+
+/* ---------- drawing sheet ---------- */
+.sheet-scroll { overflow-x: auto; border: 1px solid var(--rule); background: var(--sheet); }
+.sheet-scroll svg { display: block; width: 100%; min-width: 760px; height: auto; }
+svg .vis { fill: none; stroke: var(--ink); stroke-width: .42; stroke-linecap: round; stroke-linejoin: round; }
+svg .hid { fill: none; stroke: var(--ink); stroke-width: .22; stroke-dasharray: 1.4 .9; opacity: .75; }
+svg .ctr { fill: none; stroke: var(--blue); stroke-width: .16; stroke-dasharray: 5 1 1 1; opacity: .8; }
+svg .dim { fill: none; stroke: var(--blue); stroke-width: .16; }
+svg .arr { fill: var(--blue); stroke: none; }
+svg .dimt { fill: var(--blue); font: 500 2.7px var(--f-mono); }
+svg .frame { fill: none; stroke: var(--ink); stroke-width: .6; }
+svg .frame-o { fill: none; stroke: var(--ink); stroke-width: .2; }
+svg .tbl { fill: none; stroke: var(--ink); stroke-width: .3; }
+svg .tl { fill: var(--muted); font: 500 1.7px var(--f-mono); letter-spacing: .12px; }
+svg .tv { fill: var(--ink); font: 500 2.6px var(--f-mono); }
+svg .tt { fill: var(--ink); font: 800 6px var(--f-display); font-stretch: 125%; }
+svg .zone { fill: var(--muted); font: 500 2.2px var(--f-mono); text-anchor: middle; dominant-baseline: middle; }
+svg .vlabel { fill: var(--muted); font: 500 2.2px var(--f-mono); letter-spacing: .25px; text-anchor: middle; }
+.sheet-notes { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 14px; font: 400 .75rem/1.5 var(--f-mono); color: var(--muted); }
+.sheet-notes span::before { content: ""; display: inline-block; width: 22px; height: 0; vertical-align: middle; margin-right: 8px; border-top: 1.5px solid var(--ink); }
+.sheet-notes .k-hid::before { border-top: 1.5px dashed var(--ink); opacity: .75; }
+.sheet-notes .k-ctr::before { border-top: 1.5px dashed var(--blue); }
+.sheet-notes .k-dim::before { border-top-color: var(--blue); }
+
+/* ---------- verification ---------- */
+.ver-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: clamp(24px, 4vw, 48px); }
+@media (max-width: 900px) { .ver-grid { grid-template-columns: minmax(0, 1fr); } }
+.ver-grid > * { min-width: 0; }
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+th { font: 500 .625rem/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 0 12px 10px 0; border-bottom: 1.5px solid var(--ink); }
+td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--rule); vertical-align: baseline; }
+td.num, th.num { text-align: right; padding-right: 0; padding-left: 12px; font-size: .82rem; white-space: nowrap; }
+tr.total td { border-bottom: 1.5px solid var(--ink); font-weight: 600; }
+td .expr { display: block; font: 400 .72rem/1.4 var(--f-mono); color: var(--muted); margin-top: 2px; }
+.block { display: grid; gap: 16px; }
+.block + .block { margin-top: 40px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font: 500 .65rem/1 var(--f-mono); letter-spacing: .06em; text-transform: uppercase;
+  padding: 5px 8px 5px 7px; border: 1px solid currentColor; white-space: nowrap; }
+.chip::before { content: ""; width: 6px; height: 6px; background: currentColor; border-radius: 50%; }
+.chip.pass { color: var(--pass); } .chip.warn { color: var(--warn); } .chip.fail { color: var(--fail); } .chip.info { color: var(--blue); }
+.checks { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.checks li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: baseline; padding: 11px 0; border-bottom: 1px solid var(--rule); }
+.checks li .what { font-size: .95rem; }
+.checks li .why { grid-column: 1 / -1; font: 400 .72rem/1.45 var(--f-mono); color: var(--muted); }
+.checks li code { font-size: .8rem; }
+.callout { border-left: 2px solid var(--blue); padding: 4px 0 4px 16px; color: var(--muted); font-size: .95rem; }
+
+/* ---------- explorer ---------- */
+.lab { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); border: 1px solid var(--rule); background: var(--sheet); }
+@media (max-width: 960px) { .lab { grid-template-columns: minmax(0, 1fr); } }
+.controls { padding: 22px; border-right: 1px solid var(--rule); display: grid; gap: 16px; align-content: start; min-width: 0; }
+@media (max-width: 960px) { .controls { border-right: 0; border-bottom: 1px solid var(--rule); } }
+.ctl { display: grid; gap: 6px; }
+.ctl-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.ctl label { font: 500 .72rem/1.2 var(--f-mono); letter-spacing: .03em; }
+.ctl label i { font-style: normal; color: var(--muted); }
+.ctl output { font: 500 .8rem/1 var(--f-mono); font-variant-numeric: tabular-nums; color: var(--blue); }
+input[type="range"] { width: 100%; accent-color: var(--blue); margin: 0; }
+select { font: 500 .78rem/1.2 var(--f-mono); color: var(--ink); background: var(--paper); border: 1px solid var(--rule); padding: 7px 8px; width: 100%; }
+.ctl-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.divider { height: 1px; background: var(--rule); margin: 4px 0; }
+.lab-out { display: grid; grid-template-rows: auto auto auto; min-width: 0; }
+.profile { padding: 14px 18px 0; position: relative; }
+.profile svg { display: block; width: 100%; height: auto; max-height: 420px; }
+.profile .state { position: absolute; top: 16px; right: 18px; }
+.readouts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--rule); }
+.readouts > div { padding: 12px 16px 13px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); min-width: 0; }
+.readouts > div:nth-child(3n) { border-right: 0; }
+.readouts .v { font: 500 1.05rem/1.2 var(--f-mono); font-variant-numeric: tabular-nums; margin-top: 5px; display: block; }
+.readouts .v small { font-size: .7rem; color: var(--muted); font-weight: 400; }
+@media (max-width: 520px) {
+  .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .readouts > div:nth-child(3n) { border-right: 1px solid var(--rule); }
+  .readouts > div:nth-child(2n) { border-right: 0; }
+}
+.util { padding: 14px 16px 4px; display: grid; gap: 8px; }
+.util-bar { height: 8px; background: var(--rule-soft); position: relative; overflow: hidden; }
+.util-bar span { position: absolute; inset: 0 auto 0 0; background: var(--pass); transition: width .2s ease, background-color .2s; }
+.util-bar::after { content: ""; position: absolute; top: -2px; bottom: -2px; left: 50%; width: 1px; background: var(--ink); opacity: .5; }
+.util-top { display: flex; justify-content: space-between; gap: 12px; font: 400 .7rem/1.3 var(--f-mono); color: var(--muted); }
+.lab-checks { padding: 4px 16px 18px; }
+.formula { padding: 16px; margin-top: 18px; border: 1px dashed var(--rule); font: 400 .8rem/1.8 var(--f-mono); overflow-x: auto; white-space: nowrap; }
+.formula .lhs { color: var(--blue); }
+.lab-note { margin-top: 14px; font-size: .9rem; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .util-bar span { transition: none; } }
+
+/* ---------- build ---------- */
+.steps { list-style: none; margin: 0 0 40px; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--rule); background: var(--sheet); counter-reset: s; }
+.steps li { padding: 16px 16px 18px; border-right: 1px solid var(--rule); counter-increment: s; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.steps li:last-child { border-right: 0; }
+.steps li::before { content: counter(s, decimal-leading-zero); font: 500 .7rem/1 var(--f-mono); color: var(--blue); }
+.steps b { font: 650 1rem/1.2 var(--f-display); font-stretch: 108%; }
+.steps span { font-size: .88rem; line-height: 1.45; color: var(--muted); }
+@media (max-width: 900px) {
+  .steps { grid-template-columns: minmax(0, 1fr); }
+  .steps li { border-right: 0; border-bottom: 1px solid var(--rule); grid-template-columns: 2.2rem minmax(0, 1fr); }
+  .steps li:last-child { border-bottom: 0; }
+  .steps li::before { grid-row: span 2; padding-top: 3px; }
+}
+.code-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; }
+@media (max-width: 900px) { .code-grid { grid-template-columns: minmax(0, 1fr); } }
+.code { min-width: 0; border: 1px solid var(--rule); background: var(--sheet); }
+.code .label { padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+.code pre { margin: 0; padding: 14px; overflow-x: auto; font-size: .74rem; line-height: 1.7; tab-size: 4; }
+.code .c { color: var(--muted); font-style: italic; }
+.code .k { color: var(--blue); font-weight: 500; }
+.code .n { color: var(--warn); }
+.code .s { color: var(--pass); }
+
+/* ---------- status ---------- */
+.status-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 4vw, 48px); }
+@media (max-width: 800px) { .status-grid { grid-template-columns: minmax(0, 1fr); } }
+.status-grid > * { min-width: 0; }
+.files { display: grid; gap: 10px; }
+.file { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 16px; border: 1px solid var(--rule); background: var(--sheet); text-decoration: none; color: var(--ink); }
+.file:hover { border-color: var(--blue); }
+.file .ext { font: 700 .72rem/1 var(--f-mono); color: var(--blue); border: 1px solid var(--blue); padding: 6px 7px; }
+.file b { font: 600 .95rem/1.2 var(--f-display); display: block; }
+.file span { font-size: .85rem; color: var(--muted); }
+.file .sz { font: 400 .72rem/1 var(--f-mono); color: var(--muted); }
+.cmd { border: 1px solid var(--rule); background: var(--sheet); padding: 12px 14px; font: 400 .76rem/1.8 var(--f-mono); overflow-x: auto; white-space: pre; }
+.cmd .c { color: var(--muted); }
+
+footer { border-top: 1px solid var(--rule); padding-block: 28px 40px; }
+footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font: 400 .72rem/1.6 var(--f-mono); color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap">
+    <span class="id">test-bracket / rev A</span>
+    <nav aria-label="Sections">
+      <a href="#drawing">Drawing</a>
+      <a href="#verification">Verification</a>
+      <a href="#explore">Explore</a>
+      <a href="#build" class="opt">Build</a>
+      <a href="#status" class="opt">Roadmap</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero">
+    <div class="hero-title">
+      <p class="eyebrow">Parametric test part &middot; build123d &middot; Bremen, 2026</p>
+      <h1>L&#8209;Bracket<span class="rev">REV A</span></h1>
+    </div>
+    <div class="hero-grid">
+      <div class="hero-text">
+        <p class="lead">A 40&nbsp;mm angle bracket defined by six numbers. One Python script builds the solid, exports STEP and STL, checks the mesh against a hand calculation and generates the drawing on this page.</p>
+        <dl class="tblock" id="spec"></dl>
+      </div>
+      <figure class="viewer" id="viewer" aria-label="Interactive 3D model of the bracket">
+        <div class="vtools">
+          <div class="seg" role="group" aria-label="Display mode">
+            <button type="button" data-mode="solid" aria-pressed="true">Solid</button>
+            <button type="button" data-mode="section" aria-pressed="false">Section</button>
+            <button type="button" data-mode="xray" aria-pressed="false">X-ray</button>
+            <button type="button" data-mode="edges" aria-pressed="false">Edges</button>
+          </div>
+          <button type="button" class="btn" id="reset-view">Reset</button>
+        </div>
+        <p class="vread" id="vread">Loading model&hellip;</p>
+      </figure>
+    </div>
+  </section>
+
+  <section id="drawing">
+    <div class="sec-head">
+      <p class="eyebrow">Sheet 1 of 1 &middot; first-angle projection (ISO&nbsp;128)</p>
+      <h2>Drawing, generated from the solid</h2>
+      <p>Each view is a hidden-line projection of the actual B-rep, computed by OpenCascade's HLR algorithm through <code>project_to_viewport</code>. No line here was drawn by hand; the dimensions are placed from the same parameters that build the part.</p>
+    </div>
+    <div class="sheet-scroll"><svg id="sheet" viewBox="0 0 260 160" role="img" aria-label="Engineering drawing with front, side, top and isometric views"></svg></div>
+    <div class="sheet-notes">
+      <span>visible edge</span>
+      <span class="k-hid">hidden edge</span>
+      <span class="k-ctr">centre line</span>
+      <span class="k-dim">dimension, mm</span>
+    </div>
+  </section>
+
+  <section id="verification">
+    <div class="sec-head">
+      <p class="eyebrow">Inspection report &middot; software only</p>
+      <h2>Three independent volumes that agree</h2>
+      <p>The same quantity, computed three ways: by hand from the parameters, by the CAD kernel from the exact solid, and by trimesh from the exported triangles. If the model, the export or my maths were wrong, these would disagree.</p>
+    </div>
+    <div class="ver-grid">
+      <div>
+        <div class="block">
+          <h3>Hand calculation</h3>
+          <div class="tbl-wrap"><table id="hand"></table></div>
+          <p class="callout">The fillet term is the interesting one. A concave fillet fills the square corner region R&times;R minus a quarter disc of radius R, so it <em>adds</em> (1&nbsp;&minus;&nbsp;&pi;/4)&middot;R&sup2; of cross-section, about 21&nbsp;% of the square.</p>
+        </div>
+        <div class="block">
+          <h3>Comparison</h3>
+          <div class="tbl-wrap"><table id="compare"></table></div>
+        </div>
+      </div>
+      <div>
+        <div class="block">
+          <h3>Mesh and topology</h3>
+          <ul class="checks" id="mesh-checks"></ul>
+        </div>
+        <div class="block">
+          <h3>Test suite <span class="label" id="test-summary" style="display:inline; margin-left:8px"></span></h3>
+          <ul class="checks" id="tests"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="explore">
+    <div class="sec-head">
+      <p class="eyebrow">Design space &middot; what-if</p>
+      <h2>Change the parameters, watch the trade-offs</h2>
+      <p>The page recomputes the closed-form results as you drag. The load case: the upright is screwed to a wall and a load F hangs from the hole in the horizontal leg, like a shelf bracket. The leg is treated as a cantilever.</p>
+    </div>
+    <div class="lab">
+      <div class="controls" id="controls">
+        <div class="ctl-row">
+          <span class="label">Geometry, mm</span>
+          <button type="button" class="btn" id="reset-params">Back to Rev A</button>
+        </div>
+        <div class="ctl"><div class="ctl-top"><label for="p-LEG">Leg length <i>LEG</i></label><output id="o-LEG"></output></div><input type="range" id="p-LEG" min="25" max="80" step="1"></div>
+        <div class="ctl"><div class="ctl-top"><label for="p-WIDTH">Width <i>WIDTH</i></label><output id="o-WIDTH"></output></div><input type="range" id="p-WIDTH" min="12" max="60" step="1"></div>
+        <div class="ctl"><div class="ctl-top"><label for="p-T">Wall thickness <i>T</i></label><output id="o-T"></output></div><input type="range" id="p-T" min="2" max="10" step="0.5"></div>
+        <div class="ctl"><div class="ctl-top"><label for="p-HOLE_POS">Hole position <i>HOLE_POS</i></label><output id="o-HOLE_POS"></output></div><input type="range" id="p-HOLE_POS" min="8" max="75" step="0.5"></div>
+        <div class="ctl"><div class="ctl-top"><label for="p-FILLET_R">Inner fillet <i>FILLET_R</i></label><output id="o-FILLET_R"></output></div><input type="range" id="p-FILLET_R" min="0" max="20" step="0.5"></div>
+        <div class="ctl"><div class="ctl-top"><label for="p-screw">Screw <i>clearance / head &Oslash;</i></label></div>
+          <select id="p-screw">
+            <option value="M3">M3 &middot; &Oslash;3.4 hole &middot; &Oslash;5.5 head</option>
+            <option value="M4">M4 &middot; &Oslash;4.5 hole &middot; &Oslash;7.0 head</option>
+            <option value="M5">M5 &middot; &Oslash;5.5 hole &middot; &Oslash;8.5 head</option>
+            <option value="M6">M6 &middot; &Oslash;6.6 hole &middot; &Oslash;10 head</option>
+          </select>
+        </div>
+        <div class="divider"></div>
+        <span class="label">Load and material</span>
+        <div class="ctl"><div class="ctl-top"><label for="p-F">Load <i>F</i></label><output id="o-F"></output></div><input type="range" id="p-F" min="0" max="600" step="5"></div>
+        <div class="ctl"><div class="ctl-top"><label for="p-mat">Material</label></div>
+          <select id="p-mat">
+            <option value="pla">PLA, FDM printed</option>
+            <option value="petg">PETG, FDM printed</option>
+            <option value="al">Aluminium 6061-T6</option>
+            <option value="steel">Steel S235</option>
+          </select>
+        </div>
+        <p class="label" id="mat-note" style="text-transform:none; letter-spacing:0; line-height:1.55"></p>
+      </div>
+      <div class="lab-out">
+        <div class="profile">
+          <svg id="profile" role="img" aria-label="Side profile of the bracket with the load case"></svg>
+          <span class="state" id="lab-state"></span>
+        </div>
+        <div class="readouts" id="readouts"></div>
+        <div class="util">
+          <div class="util-top"><span>Bending stress / allowable</span><span id="util-txt"></span></div>
+          <div class="util-bar"><span id="util-fill"></span></div>
+          <div class="util-top"><span>0</span><span>&#8593; SF 2</span><span>1</span></div>
+        </div>
+        <div class="lab-checks"><ul class="checks" id="lab-checks"></ul></div>
+      </div>
+    </div>
+    <div class="formula" id="formula"></div>
+    <p class="lab-note">This is a first-order estimate: rectangular section, root at the inner face of the upright, fillet stiffening ignored (conservative). It does not cover screw pull-out, bending of the upright at its screw, or layer delamination in printed parts, which is often what fails first. Material values are typical handbook figures, not measurements. The prediction still has to be checked against a physical load test.</p>
+  </section>
+
+  <section id="build">
+    <div class="sec-head">
+      <p class="eyebrow">Pipeline &middot; one command per stage</p>
+      <h2>How the part is made</h2>
+    </div>
+    <ol class="steps">
+      <li><b>Parameters</b><span>Six numbers in <code>bracket.py</code> define the whole part.</span></li>
+      <li><b>Solid</b><span>build123d unions two boxes, fillets the inner edge and cuts two holes on the OpenCascade kernel.</span></li>
+      <li><b>Export</b><span>STEP keeps the exact geometry for CAD. STL is the triangle mesh for the slicer.</span></li>
+      <li><b>Verify</b><span>trimesh and pytest check volume, watertightness, hole count and envelope.</span></li>
+      <li><b>Publish</b><span><code>make_site.py</code> projects the drawing views and packs the mesh for this page.</span></li>
+    </ol>
+    <div class="code-grid">
+      <div class="code"><p class="label">bracket.py &middot; parameters</p><pre id="code-params"></pre></div>
+      <div class="code"><p class="label">bracket.py &middot; build_bracket()</p><pre id="code-build"></pre></div>
+    </div>
+  </section>
+
+  <section id="status">
+    <div class="status-grid">
+      <div class="block">
+        <p class="eyebrow">Roadmap</p>
+        <h2>From model to measured part</h2>
+        <ul class="checks" id="status-list"></ul>
+      </div>
+      <div class="block">
+        <p class="eyebrow">Files &amp; reproduction</p>
+        <h2>Get the part</h2>
+        <div class="files" id="files"></div>
+        <div class="cmd"><span class="c"># rebuild everything after changing a parameter</span>
+uv run python bracket.py      <span class="c"># STEP + STL</span>
+uv run pytest                 <span class="c"># geometry tests</span>
+uv run python make_site.py    <span class="c"># this page</span></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Alejandro Perret-Gentil &middot; B.Sc. Physics, Constructor University Bremen</span>
+    <span id="gen"></span>
+  </div>
+</footer>
+
+<script src="data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function () {
+  "use strict";
+  const D = window.BRACKET;
+  const P = D.params, R = D.results;
+  const REPO = "https://github.com/aperret04/test-bracket";
+  const $ = (id) => document.getElementById(id);
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const fmt = (v, d = 1) => Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }).replace(/,/g, " ");
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const MATERIALS = {
+    pla:   { name: "PLA",            rho: 1.24, E: 3.5,  s: 50,  basis: "tensile strength", note: "Filament datasheet values. Printed parts are anisotropic and weaker across layers." },
+    petg:  { name: "PETG",           rho: 1.27, E: 2.1,  s: 50,  basis: "tensile strength", note: "Filament datasheet values. Printed parts are anisotropic and weaker across layers." },
+    al:    { name: "Al 6061-T6",     rho: 2.70, E: 68.9, s: 276, basis: "yield strength",   note: "Handbook values for wrought 6061-T6." },
+    steel: { name: "Steel S235",     rho: 7.85, E: 210,  s: 235, basis: "yield strength",   note: "Nominal EN 10025 yield; handbook modulus." },
+  };
+  const SCREWS = { M3: { d: 3.4, head: 5.5 }, M4: { d: 4.5, head: 7.0 }, M5: { d: 5.5, head: 8.5 }, M6: { d: 6.6, head: 10.0 } };
+
+  function volume(p) {
+    const legs = 2 * p.LEG * p.WIDTH * p.T - p.T * p.T * p.WIDTH;
+    const fil = (1 - Math.PI / 4) * p.FILLET_R ** 2 * p.WIDTH;
+    const holes = 2 * Math.PI * (p.HOLE_D / 2) ** 2 * p.T;
+    return { legs, overlap: p.T * p.T * p.WIDTH, fil, holes, total: legs + fil - holes };
+  }
+
+  /* ---------------- hero spec ---------------- */
+  const pla = MATERIALS.pla;
+  const spec = [
+    ["Envelope", `${R.extents.map((v) => fmt(v, 0)).join(" × ")} mm`, "X × Y × Z"],
+    ["Wall", `${fmt(P.T, 0)} mm`, "both legs"],
+    ["Holes", `2 × Ø${fmt(P.HOLE_D, 1)}`, "M5 clearance, through"],
+    ["Inner fillet", `R${fmt(P.FILLET_R, 0)}`, "root of the L"],
+    ["Volume", `${fmt(R.volume_brep / 1000, 2)} cm³`, "exact B-rep"],
+    ["Mass", `≈ ${fmt(R.volume_brep / 1000 * pla.rho, 1)} g`, "PLA, ρ = 1.24 g/cm³ assumed"],
+  ];
+  $("spec").innerHTML = spec.map(([k, v, s]) => `<div><dt>${k}</dt><dd>${v}<small>${s}</small></dd></div>`).join("");
+  $("gen").textContent = `Generated ${D.generated} by make_site.py`;
+
+  /* ---------------- 3D viewer ---------------- */
+  function decode(b64, Type) {
+    const bin = atob(b64);
+    const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return new Type(u8.buffer);
+  }
+
+  function initViewer() {
+    const host = $("viewer");
+    if (!window.THREE || !THREE.OrbitControls) throw new Error("three.js unavailable");
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.localClippingEnabled = true;
+    host.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(28, 1, 1, 2000);
+    camera.up.set(0, 0, 1);
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(decode(D.mesh.positions, Float32Array), 3));
+    geo.setIndex(new THREE.BufferAttribute(decode(D.mesh.indices, Uint32Array), 1));
+    geo.computeBoundingBox();
+    const c = new THREE.Vector3(); geo.boundingBox.getCenter(c);
+    geo.translate(-c.x, -c.y, -c.z);
+    const flat = geo.toNonIndexed(); flat.computeVertexNormals();
+    const edgesGeo = new THREE.EdgesGeometry(geo, 28);
+
+    const section = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const front = new THREE.MeshStandardMaterial({ roughness: .55, metalness: .05, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+    const back = new THREE.MeshBasicMaterial({ side: THREE.BackSide });
+    const lineMat = new THREE.LineBasicMaterial();
+    const meshF = new THREE.Mesh(flat, front);
+    const meshB = new THREE.Mesh(flat, back);
+    const edges = new THREE.LineSegments(edgesGeo, lineMat);
+    const part = new THREE.Group(); part.add(meshB, meshF, edges); scene.add(part);
+
+    const bottom = -(geo.boundingBox.max.z - geo.boundingBox.min.z) / 2;
+    const grid = new THREE.GridHelper(120, 24);
+    grid.rotation.x = Math.PI / 2; grid.position.z = bottom - .01;
+    scene.add(grid);
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, .75));
+    const key = new THREE.DirectionalLight(0xffffff, .75); key.position.set(60, -80, 120); scene.add(key);
+    const rim = new THREE.DirectionalLight(0xffffff, .35); rim.position.set(-90, 60, 40); scene.add(rim);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; controls.dampingFactor = .08;
+    controls.minDistance = 60; controls.maxDistance = 400; controls.enablePan = false;
+    controls.autoRotate = !reduceMotion; controls.autoRotateSpeed = .9;
+    controls.addEventListener("start", () => { controls.autoRotate = false; });
+    const home = () => { camera.position.set(95, -125, 80); controls.target.set(0, 0, 0); controls.update(); };
+    home();
+    $("reset-view").addEventListener("click", home);
+
+    function theme() {
+      front.color.set(css("--model"));
+      back.color.set(css("--blue"));
+      lineMat.color.set(css("--ink"));
+      grid.material.color.set(css("--rule"));
+      grid.material.opacity = .9; grid.material.transparent = true;
+      render();
+    }
+
+    let mode = "solid";
+    function setMode(m) {
+      mode = m;
+      const clip = m === "section" ? [section] : [];
+      [front, back, lineMat].forEach((mat) => { mat.clippingPlanes = clip; mat.needsUpdate = true; });
+      front.transparent = m === "xray"; front.opacity = m === "xray" ? .18 : 1; front.depthWrite = m !== "xray";
+      meshF.visible = m !== "edges";
+      meshB.visible = m === "section";
+      document.querySelectorAll(".seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === m)));
+      $("vread").innerHTML = readout();
+      render();
+    }
+    function readout() {
+      const t = `<b>${D.mesh.triangles.toLocaleString("en-US")}</b> triangles from bracket.stl &middot; drag to orbit, scroll to zoom`;
+      if (mode === "section") return `Cut at Y = 0 through both holes. Blue = cut face. ` + t;
+      return t;
+    }
+    document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
+
+    function size() {
+      const w = host.clientWidth, h = host.clientHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h; camera.updateProjectionMatrix();
+      render();
+    }
+    function render() { renderer.render(scene, camera); }
+    function loop() { controls.update(); render(); requestAnimationFrame(loop); }
+
+    new ResizeObserver(size).observe(host);
+    watchTheme(theme);
+    theme(); setMode("solid"); size(); loop();
+  }
+
+  function watchTheme(fn) {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", fn);
+    new MutationObserver(fn).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  }
+
+  try { initViewer(); }
+  catch (e) {
+    $("vread").textContent = "3D view needs WebGL and an internet connection for three.js. Showing the isometric projection instead.";
+    const fb = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    fb.id = "viewer-fallback";
+    const v = D.views.iso, [x0, y0, x1, y1] = v.bbox;
+    fb.setAttribute("viewBox", `${x0 - 4} ${-y1 - 4} ${x1 - x0 + 8} ${y1 - y0 + 8}`);
+    fb.innerHTML = v.visible.map((l) => `<path class="vis" d="${path(l, (x, y) => [x, -y])}"/>`).join("");
+    $("viewer").appendChild(fb);
+    document.querySelector(".vtools").hidden = true;
+  }
+
+  /* ---------------- drawing sheet ---------------- */
+  function path(line, map) {
+    let d = "";
+    for (let i = 0; i < line.length; i += 2) {
+      const [x, y] = map(line[i], line[i + 1]);
+      d += (i ? "L" : "M") + x.toFixed(2) + " " + y.toFixed(2);
+    }
+    return d;
+  }
+
+  function drawSheet() {
+    const W = 260, H = 160, F0 = 10, F1x = 250, F1y = 150;
+    const FX = 100, FY = 75, RX = 55, TY = 118;
+    const iso = D.views.iso.bbox, IX = 182 - iso[0], IY = 24 + iso[3];
+    const maps = {
+      front: (x, y) => [FX + x, FY - y],
+      top: (x, y) => [FX + x, TY - y],
+      right: (x, y) => [RX + x, FY - y],
+      iso: (x, y) => [IX + x, IY - y],
+    };
+    const out = [];
+    const L = P.LEG, T = P.T, Wd = P.WIDTH, HP = P.HOLE_POS, Rf = P.FILLET_R, d = P.HOLE_D;
+
+    // frame + zone references
+    out.push(`<rect class="frame-o" x="3" y="3" width="${W - 6}" height="${H - 6}"/>`);
+    out.push(`<rect class="frame" x="${F0}" y="${F0}" width="${F1x - F0}" height="${F1y - F0}"/>`);
+    const cols = 4, rows = 3;
+    for (let i = 0; i < cols; i++) {
+      const cx = F0 + (i + .5) * (F1x - F0) / cols;
+      out.push(`<text class="zone" x="${cx}" y="6.6">${i + 1}</text><text class="zone" x="${cx}" y="${H - 6.4}">${i + 1}</text>`);
+      if (i) { const x = F0 + i * (F1x - F0) / cols; out.push(`<path class="frame-o" d="M${x} 3V${F0}M${x} ${F1y}V${H - 3}"/>`); }
+    }
+    for (let j = 0; j < rows; j++) {
+      const cy = F0 + (j + .5) * (F1y - F0) / rows, ch = "ABC"[j];
+      out.push(`<text class="zone" x="6.5" y="${cy}">${ch}</text><text class="zone" x="${W - 6.5}" y="${cy}">${ch}</text>`);
+      if (j) { const y = F0 + j * (F1y - F0) / rows; out.push(`<path class="frame-o" d="M3 ${y}H${F0}M${F1x} ${y}H${W - 3}"/>`); }
+    }
+
+    // centre lines (under geometry)
+    const ctr = (x1, y1, x2, y2) => out.push(`<path class="ctr" d="M${x1} ${y1}L${x2} ${y2}"/>`);
+    ctr(FX + HP, FY + 2.5, FX + HP, FY - T - 2.5);                 // front: base hole axis
+    ctr(FX - 2.5, FY - HP, FX + T + 2.5, FY - HP);                 // front: upright hole axis
+    ctr(FX - 3, TY, FX + L + 3, TY);                               // top: symmetry
+    ctr(FX + HP, TY - d / 2 - 2.5, FX + HP, TY + d / 2 + 2.5);     // top: hole
+    ctr(RX, FY - L - 3, RX, FY + 3);                               // side: symmetry
+    ctr(RX - d / 2 - 2.5, FY - HP, RX + d / 2 + 2.5, FY - HP);     // side: hole
+
+    // projected geometry
+    for (const [name, v] of Object.entries(D.views)) {
+      const m = maps[name];
+      v.hidden.forEach((l) => out.push(`<path class="hid" d="${path(l, m)}"/>`));
+      v.visible.forEach((l) => out.push(`<path class="vis" d="${path(l, m)}"/>`));
+    }
+
+    // dimensions
+    const arrow = (x, y, ang) => {
+      const a = ang * Math.PI / 180, l = 2.2, w = .7;
+      const bx = x - l * Math.cos(a), by = y - l * Math.sin(a);
+      const nx = -Math.sin(a) * w, ny = Math.cos(a) * w;
+      out.push(`<path class="arr" d="M${x} ${y}L${(bx + nx).toFixed(2)} ${(by + ny).toFixed(2)}L${(bx - nx).toFixed(2)} ${(by - ny).toFixed(2)}Z"/>`);
+    };
+    const txt = (x, y, s, rot) => out.push(`<text class="dimt" x="${x}" y="${y}" text-anchor="middle"${rot ? ` transform="rotate(-90 ${x} ${y})"` : ""}>${s}</text>`);
+    function dimH(x1, x2, y, from, label) {
+      out.push(`<path class="dim" d="M${x1} ${from + Math.sign(y - from) * 1.2}V${y + Math.sign(y - from) * 1.5}M${x2} ${from + Math.sign(y - from) * 1.2}V${y + Math.sign(y - from) * 1.5}"/>`);
+      if (x2 - x1 > 9) { out.push(`<path class="dim" d="M${x1} ${y}H${x2}"/>`); arrow(x1, y, 180); arrow(x2, y, 0); txt((x1 + x2) / 2, y - 1, label); }
+      else { out.push(`<path class="dim" d="M${x1 - 5} ${y}H${x2 + 5}"/>`); arrow(x1, y, 0); arrow(x2, y, 180); txt((x1 + x2) / 2, y - 1, label); }
+    }
+    function dimV(y1, y2, x, from, label) {   // y1 < y2 in sheet coordinates
+      const s = Math.sign(x - from);
+      out.push(`<path class="dim" d="M${from + s * 1.2} ${y1}H${x + s * 1.5}M${from + s * 1.2} ${y2}H${x + s * 1.5}"/>`);
+      if (y2 - y1 > 9) { out.push(`<path class="dim" d="M${x} ${y1}V${y2}"/>`); arrow(x, y1, -90); arrow(x, y2, 90); txt(x - 1, (y1 + y2) / 2, label, true); }
+      else { out.push(`<path class="dim" d="M${x} ${y1 - 5}V${y2 + 5}"/>`); arrow(x, y1, 90); arrow(x, y2, -90); out.push(`<text class="dimt" x="${x + 1.6}" y="${y1 - 2.4}">${label}</text>`); }
+    }
+    const n = (v) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
+
+    // front view
+    dimH(FX, FX + L, FY + 9, FY, n(L));
+    dimV(FY - L, FY, FX - 9, FX, n(L));
+    dimH(FX, FX + T, FY - L - 6, FY - L, n(T));
+    dimV(FY - T, FY, FX + L + 6, FX + L, n(T));
+    if (Rf > 0) {
+      const a = Math.PI / 4, ax = FX + T + Rf - Rf * Math.cos(a), ay = FY - T - Rf + Rf * Math.sin(a);
+      const tx = FX + T + Rf + 9, ty = FY - T - Rf - 9;
+      out.push(`<path class="dim" d="M${ax.toFixed(2)} ${ay.toFixed(2)}L${tx} ${ty}H${tx + 6}"/>`);
+      arrow(ax, ay, Math.atan2(ay - ty, ax - tx) * 180 / Math.PI);
+      out.push(`<text class="dimt" x="${tx + .6}" y="${ty - 1}">R${n(Rf)}</text>`);
+    }
+    // top view
+    dimV(TY - Wd / 2, TY + Wd / 2, FX + L + 9, FX + L, n(Wd));
+    dimH(FX, FX + HP, TY + Wd / 2 + 8, TY + Wd / 2, n(HP));
+    // side view
+    dimH(RX - Wd / 2, RX + Wd / 2, FY + 9, FY, n(Wd));
+    dimV(FY - HP, FY, RX - Wd / 2 - 8, RX - Wd / 2, n(HP));
+    {
+      const a = -Math.PI / 4, hx = RX + d / 2 * Math.cos(a), hy = FY - HP + d / 2 * Math.sin(a);
+      const tx = RX + Wd / 2 + 4, ty = FY - L - 9;
+      out.push(`<path class="dim" d="M${hx.toFixed(2)} ${hy.toFixed(2)}L${tx} ${ty}H${tx + 25}"/>`);
+      arrow(hx, hy, Math.atan2(hy - ty, hx - tx) * 180 / Math.PI);
+      out.push(`<text class="dimt" x="${tx + .6}" y="${ty - 1}">2× Ø${n(d)} THRU</text>`);
+    }
+
+    // view labels
+    const lab = (x, y, s) => out.push(`<text class="vlabel" x="${x}" y="${y}">${s}</text>`);
+    lab(FX + L / 2, FY + 17, "FRONT");
+    lab(RX, FY + 17, "SIDE (FROM +X)");
+    lab(FX + L / 2, TY + Wd / 2 + 14, "TOP");
+    lab(IX + (iso[0] + iso[2]) / 2, IY - iso[1] + 7, "ISOMETRIC");
+
+    // title block
+    const bx = 160, by = 112, bw = F1x - bx, bh = F1y - by;
+    out.push(`<rect class="tbl" x="${bx}" y="${by}" width="${bw}" height="${bh}"/>`);
+    out.push(`<path class="tbl" d="M${bx} ${by + 14}H${F1x}M${bx} ${by + 26}H${F1x}M${bx + 30} ${by + 14}V${F1y}M${bx + 60} ${by + 14}V${F1y}"/>`);
+    const cell = (x, y, k, v) => out.push(`<text class="tl" x="${x + 1.6}" y="${y + 3}">${k}</text><text class="tv" x="${x + 1.6}" y="${y + 8.6}">${v}</text>`);
+    out.push(`<text class="tl" x="${bx + 1.6}" y="${by + 3}">TITLE</text><text class="tt" x="${bx + 1.6}" y="${by + 11.2}">L-BRACKET</text>`);
+    out.push(`<text class="tl" x="${F1x - 1.6}" y="${by + 3}" text-anchor="end">REV</text><text class="tv" x="${F1x - 1.6}" y="${by + 11}" text-anchor="end" style="font-size:4px">A</text>`);
+    cell(bx, by + 14, "MATERIAL", "PLA (planned)");
+    cell(bx + 30, by + 14, "UNITS", "mm");
+    cell(bx + 60, by + 14, "SCALE", "NTS");
+    cell(bx, by + 26, "DRAWN", "A. Perret-Gentil");
+    cell(bx + 30, by + 26, "DATE", D.generated);
+    out.push(`<text class="tl" x="${bx + 61.6}" y="${by + 29}">PROJECTION</text>`);
+    // first-angle symbol: truncated cone side view left, end view (two circles) right
+    const sx = bx + 64, sy = by + 34.5;
+    out.push(`<path class="tbl" d="M${sx} ${sy - 3}L${sx + 8} ${sy - 1.8}V${sy + 1.8}L${sx} ${sy + 3}Z"/>`);
+    out.push(`<circle class="tbl" cx="${sx + 17}" cy="${sy}" r="3"/><circle class="tbl" cx="${sx + 17}" cy="${sy}" r="1.8"/>`);
+    out.push(`<path class="ctr" d="M${sx - 1.5} ${sy}H${sx + 21.5}M${sx + 17} ${sy - 4.2}V${sy + 4.2}"/>`);
+
+    $("sheet").innerHTML = out.join("");
+  }
+  drawSheet();
+
+  /* ---------------- verification ---------------- */
+  (function verification() {
+    const v = volume(P);
+    const rows = [
+      ["Two legs", `2 · LEG · WIDTH · T = 2 · ${P.LEG} · ${P.WIDTH} · ${P.T}`, 2 * P.LEG * P.WIDTH * P.T],
+      ["Overlap counted twice", `− T² · WIDTH = − ${P.T}² · ${P.WIDTH}`, -v.overlap],
+      ["Inner fillet", `+ (1 − π/4) · R² · WIDTH = 0.2146 · ${P.FILLET_R}² · ${P.WIDTH}`, v.fil],
+      ["Two holes", `− 2 · π (d/2)² · T = 2π · ${P.HOLE_D / 2}² · ${P.T}`, -v.holes],
+    ];
+    $("hand").innerHTML = `<thead><tr><th>Term</th><th class="num">mm³</th></tr></thead><tbody>` +
+      rows.map(([k, e, val]) => `<tr><td>${k}<span class="expr">${e}</span></td><td class="num">${val >= 0 ? "+" : "−"}${fmt(Math.abs(val), 2)}</td></tr>`).join("") +
+      `<tr class="total"><td>Volume</td><td class="num">${fmt(R.volume_hand, 2)}</td></tr></tbody>`;
+
+    const rel = (x) => (x - R.volume_hand) / R.volume_hand * 100;
+    const cmp = [
+      ["Hand calculation", "closed form, above", R.volume_hand, null],
+      ["B-rep solid", "OpenCascade, exact geometry", R.volume_brep, rel(R.volume_brep)],
+      ["STL mesh", `trimesh, ${D.mesh.triangles} triangles`, R.volume_stl, rel(R.volume_stl)],
+    ];
+    $("compare").innerHTML = `<thead><tr><th>Method</th><th class="num">mm³</th><th class="num">Δ vs hand</th></tr></thead><tbody>` +
+      cmp.map(([k, s, val, dv]) => `<tr><td>${k}<span class="expr">${s}</span></td><td class="num">${fmt(val, 2)}</td><td class="num">${dv === null ? "ref" : (dv >= 0 ? "+" : "−") + Math.abs(dv).toFixed(4) + " %"}</td></tr>`).join("") +
+      `</tbody>`;
+
+    const genus = (2 - R.euler) / 2;
+    const ext = R.extents.map((x) => fmt(x, 2));
+    const meshChecks = [
+      [R.watertight, "Mesh is watertight", "every edge is shared by exactly two triangles, so the slicer sees a closed solid"],
+      [genus === 2, `Genus ${genus}: two through-holes`, `Euler characteristic V − E + F = ${R.euler} = 2 − 2g, counted on the exported mesh`],
+      [Math.abs(R.extents[0] - P.LEG) < 1e-6 && Math.abs(R.extents[1] - P.WIDTH) < 1e-6, `Envelope ${ext.join(" × ")} mm`, "bounding box of the STL matches LEG × WIDTH × LEG"],
+      [true, `Surface area ${fmt(R.area_brep, 0)} mm²`, `B-rep: ${R.faces_brep} faces, ${R.edges_brep} edges`],
+      [true, `Centre of mass (${R.center_of_mass.map((x) => fmt(x, 2)).join(", ")}) mm`, "from the outer corner; on the diagonal x = z, as the symmetry requires"],
+    ];
+    $("mesh-checks").innerHTML = meshChecks.map(([ok, w, why]) =>
+      `<li><span class="what">${w}</span><span class="chip ${ok ? "pass" : "fail"}">${ok ? "pass" : "fail"}</span><span class="why">${why}</span></li>`).join("");
+
+    const labels = {
+      test_brep_volume_matches_hand_calc: "B-rep volume equals the hand calculation (rel. 1e-6)",
+      test_stl_volume_close_to_brep: "STL volume within 0.1 % of the B-rep",
+      test_stl_is_watertight: "Exported mesh is watertight",
+      test_two_through_holes: "Mesh topology has exactly two through-holes",
+      test_bounding_box: "Bounding box equals LEG × WIDTH × LEG",
+    };
+    const passed = D.tests.filter((t) => t.outcome === "passed").length;
+    $("test-summary").textContent = `${passed}/${D.tests.length} passed`;
+    $("tests").innerHTML = D.tests.map((t) =>
+      `<li><span class="what">${labels[t.name] || t.name}</span><span class="chip ${t.outcome === "passed" ? "pass" : "fail"}">${t.outcome}</span><span class="why">${t.name} &middot; ${t.ms} ms</span></li>`).join("");
+  })();
+
+  /* ---------------- explorer ---------------- */
+  const KEYS = ["LEG", "WIDTH", "T", "HOLE_POS", "FILLET_R"];
+  const st = { F: 50, mat: "pla", screw: "M5" };
+  function resetParams() {
+    KEYS.forEach((k) => { st[k] = P[k]; });
+    st.screw = Object.keys(SCREWS).find((k) => SCREWS[k].d === P.HOLE_D) || "M5";
+    syncInputs();
+  }
+  function syncInputs() {
+    KEYS.forEach((k) => { $("p-" + k).value = st[k]; });
+    $("p-F").value = st.F; $("p-mat").value = st.mat; $("p-screw").value = st.screw;
+    update();
+  }
+  KEYS.concat(["F"]).forEach((k) => $("p-" + k).addEventListener("input", (e) => { st[k] = Number(e.target.value); update(); }));
+  $("p-mat").addEventListener("change", (e) => { st.mat = e.target.value; update(); });
+  $("p-screw").addEventListener("change", (e) => { st.screw = e.target.value; update(); });
+  $("reset-params").addEventListener("click", resetParams);
+
+  function update() {
+    const s = SCREWS[st.screw], m = MATERIALS[st.mat];
+    // keep the hole on the leg
+    const hpMax = st.LEG - s.d / 2 - 1;
+    $("p-HOLE_POS").max = hpMax;
+    if (st.HOLE_POS > hpMax) { st.HOLE_POS = hpMax; $("p-HOLE_POS").value = hpMax; }
+    const p = { LEG: st.LEG, WIDTH: st.WIDTH, T: st.T, HOLE_POS: st.HOLE_POS, FILLET_R: st.FILLET_R, HOLE_D: s.d };
+
+    KEYS.forEach((k) => { $("o-" + k).textContent = fmt(st[k], st[k] % 1 ? 1 : 0) + " mm"; });
+    $("o-F").textContent = `${st.F} N · ≈ ${fmt(st.F / 9.81, 1)} kg`;
+    $("mat-note").textContent = `ρ = ${m.rho} g/cm³ · E = ${m.E} GPa · ${m.basis} ${m.s} MPa. ${m.note}`;
+
+    const V = volume(p).total;
+    const mass = V / 1000 * m.rho;
+    const Lb = p.HOLE_POS - p.T;                                  // lever arm, inner face to hole
+    const sig = Lb > 0 ? 6 * st.F * Lb / (p.WIDTH * p.T ** 2) : 0;   // MPa
+    const defl = Lb > 0 ? 4 * st.F * Lb ** 3 / (m.E * 1000 * p.WIDTH * p.T ** 3) : 0; // mm
+    const sf = sig > 0 ? m.s / sig : Infinity;
+    const Fallow = Lb > 0 ? m.s * p.WIDTH * p.T ** 2 / (6 * Lb) : Infinity;
+
+    const asBuilt = KEYS.every((k) => Math.abs(st[k] - P[k]) < 1e-9) && s.d === P.HOLE_D;
+    $("lab-state").innerHTML = asBuilt
+      ? `<span class="chip info">Rev A as exported</span>`
+      : `<span class="chip warn">What-if, not built</span>`;
+
+    const ro = [
+      ["Volume", `${fmt(V / 1000, 2)} <small>cm³</small>`],
+      ["Mass", `${fmt(mass, 1)} <small>g</small>`],
+      ["Lever arm", `${fmt(Lb, 1)} <small>mm</small>`],
+      ["Root stress σ", `${fmt(sig, 1)} <small>MPa</small>`],
+      ["Deflection δ", `${defl < .01 && defl > 0 ? defl.toExponential(1) : fmt(defl, 2)} <small>mm</small>`],
+      ["Load at σ = allow.", `${isFinite(Fallow) ? fmt(Fallow, 0) : "—"} <small>N</small>`],
+    ];
+    $("readouts").innerHTML = ro.map(([k, v]) => `<div><span class="label">${k}</span><span class="v">${v}</span></div>`).join("");
+
+    const u = sig / m.s;
+    const fill = $("util-fill");
+    fill.style.width = Math.min(u, 1) * 100 + "%";
+    fill.style.backgroundColor = u > 1 ? css("--fail") : u > .5 ? css("--warn") : css("--pass");
+    $("util-txt").textContent = isFinite(sf) ? `${(u * 100).toFixed(0)} % · safety factor ${sf >= 100 ? ">100" : sf.toFixed(1)}` : "no load";
+
+    const headGap = p.HOLE_POS - s.head / 2 - (p.T + p.FILLET_R);
+    const edge = p.LEG - p.HOLE_POS, edgeMin = 1.5 * s.d;
+    const side = (p.WIDTH - s.head) / 2;
+    const checks = [
+      [headGap >= 0 ? "pass" : "fail", "Screw head seats clear of the fillet",
+        `hole − head/2 − (T + R) = ${fmt(headGap, 2)} mm on both legs`],
+      [edge >= edgeMin ? "pass" : "warn", "Hole edge distance ≥ 1.5 d",
+        `${fmt(edge, 1)} mm to the leg end, rule of thumb asks ${fmt(edgeMin, 1)} mm`],
+      [side >= 0 ? "pass" : "fail", "Screw head fits the width",
+        `${fmt(side, 2)} mm margin each side for a Ø${s.head} head`],
+      [sf >= 2 ? "pass" : sf >= 1 ? "warn" : "fail", "Safety factor ≥ 2 on bending",
+        isFinite(sf) ? `SF = ${m.s} / ${fmt(sig, 1)} = ${sf >= 100 ? ">100" : sf.toFixed(2)}` : "no load applied"],
+    ];
+    $("lab-checks").innerHTML = checks.map(([c, w, why]) =>
+      `<li><span class="what">${w}</span><span class="chip ${c}">${c}</span><span class="why">${why}</span></li>`).join("");
+
+    $("formula").innerHTML = Lb > 0
+      ? `<span class="lhs">σ</span> = 6·F·L / (b·t²) = 6 · ${st.F} · ${fmt(Lb, 1)} / (${p.WIDTH} · ${p.T}²) = <b>${fmt(sig, 2)} MPa</b><br>` +
+        `<span class="lhs">δ</span> = 4·F·L³ / (E·b·t³) = 4 · ${st.F} · ${fmt(Lb, 1)}³ / (${fmt(m.E * 1000, 0)} · ${p.WIDTH} · ${p.T}³) = <b>${fmt(defl, 3)} mm</b>`
+      : `Hole sits inside the upright: no lever arm, the cantilever model does not apply.`;
+
+    drawProfile(p, s, asBuilt);
+  }
+
+  function drawProfile(p, s, asBuilt) {
+    const { LEG: L, T, HOLE_POS: HP, FILLET_R: R } = p, d = s.d, hh = s.head / 2;
+    const top = Math.max(L, T + 26) + 6, left = -10, right = L + 10, bottom = -8;
+    const Y = (z) => top - z;                                   // world z -> svg y
+    const svg = $("profile");
+    svg.setAttribute("viewBox", `${left} 0 ${right - left} ${top - bottom}`);
+    const o = [];
+    o.push(`<defs><pattern id="hatch" width="2.4" height="2.4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V2.4" style="stroke:var(--muted);stroke-width:.35"/></pattern></defs>`);
+    // wall
+    o.push(`<rect x="-6" y="${Y(L + 4)}" width="6" height="${L + 4 + 6}" style="fill:url(#hatch)"/>`);
+    o.push(`<path d="M0 ${Y(L + 4)}V${Y(-6)}" style="stroke:var(--muted);stroke-width:.4"/>`);
+    // body
+    const r = Math.min(R, L - T - .01);
+    const body = r > 0
+      ? `M0 ${Y(0)}H${L}V${Y(T)}H${T + r}A${r} ${r} 0 0 1 ${T} ${Y(T + r)}V${Y(L)}H0Z`
+      : `M0 ${Y(0)}H${L}V${Y(T)}H${T}V${Y(L)}H0Z`;
+    o.push(`<path d="${body}" style="fill:var(--blue-wash);stroke:var(--ink);stroke-width:.45;stroke-linejoin:round"/>`);
+    // holes (hidden) + axes
+    const hid = "stroke:var(--ink);stroke-width:.25;stroke-dasharray:1.2 .8;fill:none";
+    const ct = "stroke:var(--blue);stroke-width:.18;stroke-dasharray:4 .8 .8 .8;fill:none";
+    o.push(`<path d="M${HP - d / 2} ${Y(0)}V${Y(T)}M${HP + d / 2} ${Y(0)}V${Y(T)}" style="${hid}"/>`);
+    o.push(`<path d="M0 ${Y(HP - d / 2)}H${T}M0 ${Y(HP + d / 2)}H${T}" style="${hid}"/>`);
+    o.push(`<path d="M${HP} ${Y(-2)}V${Y(T + 2)}M-2 ${Y(HP)}H${T + 2}" style="${ct}"/>`);
+    // screw head footprints
+    const clash = HP - hh < T + R;
+    const headStyle = `fill:${clash ? "var(--fail)" : "var(--ink)"};opacity:${clash ? .85 : .55}`;
+    o.push(`<rect x="${HP - hh}" y="${Y(T + 1.6)}" width="${2 * hh}" height="1.6" style="${headStyle}"/>`);
+    o.push(`<rect x="${T}" y="${Y(HP + hh)}" width="1.6" height="${2 * hh}" style="${headStyle}"/>`);
+    // load arrow
+    if (st.F > 0 && HP > T) {
+      const a0 = T + 1.6 + 14, a1 = T + 1.6 + .4;
+      o.push(`<path d="M${HP} ${Y(a0)}V${Y(a1) - 2.2}" style="stroke:var(--blue);stroke-width:.6"/>`);
+      o.push(`<path d="M${HP} ${Y(a1)}l-1.1 -2.6h2.2z" style="fill:var(--blue)"/>`);
+      o.push(`<text x="${HP + 1.6}" y="${Y(a0) + 3}" style="fill:var(--blue);font:500 3px var(--f-mono)">F = ${st.F} N</text>`);
+      // lever arm
+      const yl = Y(-4);
+      o.push(`<path d="M${T} ${yl}H${HP}M${T} ${yl - 1.2}v2.4M${HP} ${yl - 1.2}v2.4" style="stroke:var(--blue);stroke-width:.2"/>`);
+      o.push(`<text x="${(T + HP) / 2}" y="${yl - 1}" text-anchor="middle" style="fill:var(--blue);font:500 2.4px var(--f-mono)">L = ${fmt(HP - T, 1)}</text>`);
+    }
+    o.push(`<text x="-5.4" y="${Y(L + 4) - 1.4}" style="fill:var(--muted);font:500 2.2px var(--f-mono)">WALL</text>`);
+    svg.innerHTML = o.join("");
+  }
+
+  resetParams();
+  watchTheme(update);
+
+  /* ---------------- code ---------------- */
+  function hl(src) {
+    return esc(src).replace(/(#.*$)|("""[\s\S]*?"""|"[^"\n]*")|\b(def|return|if|for|in|and|or|not|assert|else|import|from)\b|\b(\d+\.?\d*)\b/gm,
+      (m, c, s, k, n) => c ? `<span class="c">${c}</span>` : s ? `<span class="s">${s}</span>` : k ? `<span class="k">${k}</span>` : `<span class="n">${n}</span>`);
+  }
+  $("code-params").innerHTML = hl(D.code.params);
+  $("code-build").innerHTML = hl(D.code.build);
+
+  /* ---------------- status + files ---------------- */
+  const status = [
+    ["pass", "Parametric model", "build123d, six parameters, rev A"],
+    ["pass", "STEP and STL exported", "regenerated on every run of bracket.py"],
+    ["pass", "Verified in software", `${passed()} tests, three-way volume check, watertight mesh`],
+    ["pass", "Drawing generated", "first-angle views from hidden-line projection"],
+    ["info", "Print", "university club printer; weigh the part and compare with the predicted mass"],
+    ["info", "Stiffness test", "upright clamped, known weights on the hole, deflection with a dial gauge; fit the slope against δ = 4FL³/(Ebt³)"],
+    ["info", "Failure test", "load to failure in two print orientations to see how much the layers cost"],
+  ];
+  function passed() { return D.tests.filter((t) => t.outcome === "passed").length + "/" + D.tests.length; }
+  $("status-list").innerHTML = status.map(([c, w, why]) =>
+    `<li><span class="what">${w}</span><span class="chip ${c}">${c === "pass" ? "done" : "next"}</span><span class="why">${why}</span></li>`).join("");
+
+  const kb = (b) => (b / 1024).toFixed(0) + " kB";
+  $("files").innerHTML = [
+    ["STEP", "bracket.step", "Exact B-rep for Onshape, SolidWorks, Fusion", D.files["bracket.step"]],
+    ["STL", "bracket.stl", `Mesh for the slicer · ${D.mesh.triangles} triangles`, D.files["bracket.stl"]],
+  ].map(([e, f, s, b]) => `<a class="file" href="${REPO}/blob/main/exports/${f}" target="_blank" rel="noopener"><span class="ext">${e}</span><span><b>${f}</b><span>${s}</span></span><span class="sz">${kb(b)}</span></a>`).join("");
+})();
+</script>
+</body>
+</html>

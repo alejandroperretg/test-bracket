@@ -1,5 +1,6 @@
 """Simple L-bracket with one screw hole per leg. Exports STEP + STL to ./exports."""
 
+import math
 from pathlib import Path
 
 import trimesh
@@ -13,11 +14,19 @@ WIDTH = 30.0      # bracket width (Y)
 T = 4.0           # wall thickness
 HOLE_D = 5.5      # M5 clearance hole
 HOLE_POS = 24.0   # hole centre distance from the outer corner
-FILLET_R = 8.0   # inner corner fillet radius (0 = sharp corner)
+FILLET_R = 8.0    # inner corner fillet radius (0 = sharp corner)
 
 EXPORTS = Path(__file__).parent / "exports"
 
 A = (Align.MIN, Align.CENTER, Align.MIN)
+
+
+def analytic_volume():
+    """Hand calculation of the volume [mm^3], independent of the CAD kernel."""
+    legs = 2 * LEG * WIDTH * T - T * T * WIDTH          # overlap block counted once
+    fillet_add = (1 - math.pi / 4) * FILLET_R**2 * WIDTH
+    holes = 2 * math.pi * (HOLE_D / 2) ** 2 * T
+    return legs + fillet_add - holes
 
 
 def build_bracket():
